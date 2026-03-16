@@ -11,35 +11,32 @@
     <section class="mb-8">
       <h2 class="text-lg font-semibold mb-4 flex items-center">
         Incoming Orders 
-        <span class="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
-          New
+        <span v-if="activeOrders.length > 0" class="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
+          {{ activeOrders.length }} New
         </span>
       </h2>
       
-      <div v-for="order in activeOrders" :key="order.id" class="bg-white rounded-xl shadow-md border-l-4 border-orange-500 mb-4 overflow-hidden">
+      <div v-if="activeOrders.length === 0" class="text-gray-500 italic p-4 bg-white rounded-xl shadow-sm">
+        No pending orders right now.
+      </div>
+
+      <div v-else v-for="order in activeOrders" :key="order.id" class="bg-white rounded-xl shadow-md border-l-4 border-orange-500 mb-4 overflow-hidden">
         <div class="p-4">
           <div class="flex justify-between mb-2">
             <span class="font-bold text-gray-800">Order #{{ order.id.slice(0,5) }}</span>
-            <span class="text-green-600 font-bold underline">{{ order.total_payout }} UGX</span>
+            <span class="text-green-600 font-bold underline">{{ order.total_payout_ugx?.toLocaleString() }} UGX</span>
           </div>
           
           <ul class="text-sm text-gray-600 mb-4 space-y-1 border-y py-2 border-gray-100">
-            <li v-for="item in order.items" :key="item.name">
-              {{ item.quantity }}x {{ item.name }}
+            <li v-for="item in order.order_items" :key="item.id">
+              {{ item.quantity }}x {{ item.products?.name }}
             </li>
           </ul>
 
-          <div class="flex gap-2 mt-4">
-            <button v-if="order.status === 'Received'" 
-                    @click="updateStatus(order.id, 'Preparing')"
-                    class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold active:scale-95 transition-transform">
-              Accept & Pack
-            </button>
-            
-            <button v-if="order.status === 'Preparing'" 
-                    @click="updateStatus(order.id, 'Out for Delivery')"
-                    class="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold active:scale-95 transition-transform">
-              Hand to Boda [Out for Delivery]
+          <div class="flex mt-4">
+            <button @click="openOrder(order)"
+                    class="w-full bg-blue-50 text-blue-700 py-3 rounded-lg font-semibold border border-blue-200 active:scale-95 transition-transform">
+              Review & Process Order
             </button>
           </div>
         </div>
@@ -55,50 +52,72 @@
         <div v-for="product in products" :key="product.id" class="p-4 flex items-center justify-between">
           <div>
             <p class="font-medium text-gray-800">{{ product.name }}</p>
-            <p class="text-xs text-gray-500">{{ product.price }} UGX / {{ product.unit }}</p>
+            <p class="text-xs text-gray-500">{{ product.price_ugx?.toLocaleString() }} UGX / {{ product.unit }}</p>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" v-model="product.in_stock" class="sr-only peer">
+            <input type="checkbox" v-model="product.in_stock" @change="toggleStock(product)" class="sr-only peer">
             <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
           </label>
         </div>
       </div>
     </section>
+
+    <OrderDetailsModal 
+      :is-open="isModalOpen" 
+      :order="selectedOrder" 
+      @close="isModalOpen = false"
+      @refresh="fetchOrders"
+    />
   </div>
 </template>
 
 <script setup>
-// Mock data representing the "Single Opaque Entity" model [cite: 11]
-const activeOrders = ref([
-  {
-    id: 'QS-9921',
-    status: 'Received',
-    total_payout: '34,000', // Groceries + Delivery Fee [cite: 24]
-    items: [{ name: 'Tomatoes (Small Basin)', quantity: 1 }, { name: 'Beef (1kg)', quantity: 2 }]
-  }
-]);
+import { ref, onMounted } from 'vue';
 
-const products = ref([
-  { id: 1, name: 'Tomatoes', price: '2,000', unit: 'Heap', in_stock: true },
-  { id: 2, name: 'Onions', price: '1,500', unit: 'Heap', in_stock: false },
-]);
-
-const updateStatus = (id, newStatus) => {
-  const order = activeOrders.value.find(o => o.id === id);
-  if (order) order.status = newStatus;
-  // Logic to trigger Firebase Cloud Messaging notification [cite: 63]
-};
+// State Variables
+const activeOrders = ref([]);
+const products = ref([]);
 const isModalOpen = ref(false);
 const selectedOrder = ref(null);
 
+const supabase = useSupabaseClient();
+
+// Data Fetching Logic (Runs on client to prevent SSR crashes)
+const fetchOrders = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(*, products(name))')
+    .in('status', ['Received', 'Preparing']) // Only show active orders
+    .order('created_at', { ascending: false });
+  
+  if (!error) activeOrders.value = data || [];
+};
+
+const fetchProducts = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('name');
+    
+  if (!error) products.value = data || [];
+};
+
+// Lifecycle Hook
+onMounted(() => {
+  fetchOrders();
+  fetchProducts();
+});
+
+// UI Actions
 const openOrder = (order) => {
   selectedOrder.value = order;
   isModalOpen.value = true;
 };
+
+const toggleStock = async (product) => {
+  await supabase
+    .from('products')
+    .update({ in_stock: product.in_stock })
+    .eq('id', product.id);
+};
 </script>
-<OrderDetailsModal 
-  :is-open="isModalOpen" 
-  :order="selectedOrder" 
-  @close="isModalOpen = false"
-  @refresh="fetchOrders"
-/>
