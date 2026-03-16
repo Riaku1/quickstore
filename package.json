@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@nuxtjs/supabase": "^2.0.4",
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "lucide-vue-next": "^0.577.0"
+  }
+}
