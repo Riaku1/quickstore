@@ -1,7 +1,22 @@
 {
+  "name": "quickstore-vendor-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
   "dependencies": {
-    "@nuxtjs/supabase": "^2.0.4",
-    "@nuxtjs/tailwindcss": "^6.14.0",
-    "lucide-vue-next": "^0.577.0"
+    "@nuxtjs/supabase": "latest",
+    "@nuxtjs/tailwindcss": "latest",
+    "lucide-vue-next": "latest",
+    "nuxt": "^4.1.3"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vue-tsc": "latest"
   }
 }

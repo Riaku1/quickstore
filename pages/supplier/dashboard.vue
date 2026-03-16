@@ -88,4 +88,17 @@ const updateStatus = (id, newStatus) => {
   if (order) order.status = newStatus;
   // Logic to trigger Firebase Cloud Messaging notification [cite: 63]
 };
+const isModalOpen = ref(false);
+const selectedOrder = ref(null);
+
+const openOrder = (order) => {
+  selectedOrder.value = order;
+  isModalOpen.value = true;
+};
 </script>
+<OrderDetailsModal 
+  :is-open="isModalOpen" 
+  :order="selectedOrder" 
+  @close="isModalOpen = false"
+  @refresh="fetchOrders"
+/>
