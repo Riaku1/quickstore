@@ -23,17 +23,31 @@
   </div>
 </template>
 
-<script setup lang="ts">
-const { cart, addToCart, totalCharge } = useCart()
-const supabase = useSupabaseClient()
+<script setup>
+import { ref, onMounted } from 'vue'
 
-// Fetch products from Supabase
-const { data: products } = await useAsyncData('products', async () => {
-  const { data } = await supabase.from('products').select('*').eq('supplier_active', true)
-  return data
+// 1. Initialize variables as empty/null
+const orders = ref([])
+const error = ref(null)
+
+// 2. ONLY run the database call after the component mounts on the client
+onMounted(async () => {
+  const supabase = useSupabaseClient()
+  
+  try {
+    const { data, err } = await supabase.from('orders').select('*')
+    if (err) throw err
+    orders.value = data
+  } catch (e) {
+    error.value = e.message
+  }
 })
-
-const navigateToCheckout = () => {
-  navigateTo('/checkout')
-}
 </script>
+
+<template>
+  <div>
+    <div v-if="orders.length === 0">Loading orders...</div>
+    <div v-else>
+      </div>
+  </div>
+</template>
